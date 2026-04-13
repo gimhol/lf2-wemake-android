@@ -71,6 +71,8 @@ fun FullScreenWebView(
         ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.MATCH_PARENT
       )
+      setBackgroundColor(0)
+      background = null
       settings.javaScriptEnabled = true
       settings.domStorageEnabled = true
       settings.allowFileAccess = true
