@@ -21,7 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import ink.gim.lfw.ui.theme.MyApplicationTheme
+import ink.gim.lfw.ui.theme.LFWAppTheme
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
         or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
       )
     setContent {
-      MyApplicationTheme {
+      LFWAppTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
           FullScreenWebView(
             url = "https://lf.gim.ink/0.1.23",

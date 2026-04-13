@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+/keystore.debug.json
+/keystore.release.json
