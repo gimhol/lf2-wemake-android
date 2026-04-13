@@ -1,7 +1,6 @@
 package ink.gim.lfw
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -16,16 +15,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.WindowCompat
 import ink.gim.lfw.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -37,6 +32,7 @@ class MainActivity : ComponentActivity() {
       WindowManager.LayoutParams.FLAG_FULLSCREEN,
       WindowManager.LayoutParams.FLAG_FULLSCREEN
     )
+    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     window.decorView.systemUiVisibility = (
       View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
@@ -50,27 +46,13 @@ class MainActivity : ComponentActivity() {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
           FullScreenWebView(
             url = "https://lf.gim.ink/0.1.23",
-            modifier = Modifier.fillMaxSize().padding(innerPadding)
+            modifier = Modifier
+              .padding(innerPadding)
+              .fillMaxSize()
           )
         }
       }
     }
-  }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-  Text(
-    text = "Hello $name!",
-    modifier = modifier
-  )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-  MyApplicationTheme {
-    Greeting("Android")
   }
 }
 
@@ -82,7 +64,6 @@ fun FullScreenWebView(
 ) {
   val context = LocalContext.current
 
-  // 记住 WebView 实例，避免重组重建
   val webView = remember {
     WebView(context).apply {
       setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -96,21 +77,20 @@ fun FullScreenWebView(
       settings.allowContentAccess = true
       settings.mediaPlaybackRequiresUserGesture = false
       settings.cacheMode = WebSettings.LOAD_DEFAULT
+      settings.userAgentString = settings.userAgentString + " lfw-mobile-container"
       webViewClient = WebViewClient()
     }
   }
 
   AndroidView(
     factory = { webView },
-    modifier = modifier.fillMaxSize()
+    modifier = modifier
   ) { view ->
-    // 避免重复加载
     if (view.url != url) {
       view.loadUrl(url)
     }
   }
 
-  // 销毁防泄漏
   DisposableEffect(Unit) {
     onDispose {
       webView.stopLoading()
