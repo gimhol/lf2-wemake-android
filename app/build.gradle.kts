@@ -18,6 +18,7 @@ fun MutableMap<Any?, Any?>.getString(key: String): String? {
   }
   return ret
 }
+
 val appVersionCodeFromGit
   get(): Int? {
     return try {
@@ -148,12 +149,22 @@ android {
     release {
       isMinifyEnabled = false
       proguardFiles(
-        getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+      )
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
       signingConfig = signingConfigs.getByName("debug")
     }
+  }
+  applicationVariants.all {
+    outputs
+      .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
+      .forEach { output ->
+        // 自定义输出文件名
+        val newName = "lfw.${buildType.name}.v$versionName.$versionCode.apk"
+        output.outputFileName = newName
+      }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
