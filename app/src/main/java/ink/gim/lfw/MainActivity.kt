@@ -21,18 +21,24 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -86,14 +92,16 @@ class MainActivity : ComponentActivity() {
       )
     setContent {
       var gameUrl by remember { mutableStateOf<String?>(null) }
-      var text by remember { mutableStateOf<String?>(null) }
-      var pageFinished by remember { mutableStateOf(false) }
+      var text by remember { mutableStateOf<String>("") }
+      var pageStatus by remember { mutableStateOf("loading") }
       val alpha = remember { Animatable(0f) }
       val context = LocalContext.current
       val coroutineScope = rememberCoroutineScope()
-      LaunchedEffect(Unit) {
+      var retryFlag by remember { mutableIntStateOf(0) }
+      LaunchedEffect(retryFlag) {
         withContext(Dispatchers.IO) {
           try {
+            pageStatus = "loading"
             val indexUrl = "https://gim.ink/api/lfwm/find?id=1"
             text = "loading: $indexUrl"
             val infoPath = HttpReq(indexUrl)
@@ -108,12 +116,14 @@ class MainActivity : ComponentActivity() {
           } catch (e: Exception) {
             e.printStackTrace()
             text += "\n${e.message}\n${e.stackTraceToString()}"
+            pageStatus = "failed"
             withContext(Dispatchers.Main) {
               Toast.makeText(context, "Failed!", Toast.LENGTH_SHORT).show()
             }
           }
         }
       }
+
       LFWAppTheme {
         Scaffold(
           modifier = Modifier
@@ -167,11 +177,9 @@ class MainActivity : ComponentActivity() {
 
                   override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    if (pageFinished) return
-                    text = null
-                    pageFinished = true
+                    if (pageStatus == "done") return
+                    pageStatus = "done"
                     coroutineScope.launch {
-                      delay(500)
                       alpha.animateTo(1.0f, tween(1000))
                     }
                     Toast.makeText(context, "Page Loaded!", Toast.LENGTH_SHORT).show()
@@ -180,18 +188,40 @@ class MainActivity : ComponentActivity() {
               }
             )
           }
-          text?.let { text ->
-            Box(
+
+          if (alpha.value < 1) {
+            Column(
               modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .alpha(1 - alpha.value)
             ) {
-              SelectionContainer {
-                Text(
-                  text = text,
-                  modifier = Modifier.padding(10.dp)
-                )
+              Box(
+                modifier = Modifier
+                  .weight(1f)
+                  .fillMaxWidth()
+                  .verticalScroll(rememberScrollState())
+              ) {
+                SelectionContainer {
+                  Text(
+                    text = text,
+                    modifier = Modifier.padding(10.dp)
+                  )
+                }
+              }
+              if (pageStatus == "failed") {
+                Row(
+                  horizontalArrangement = Arrangement.SpaceAround,
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp)
+                ) {
+                  Button(onClick = {
+                    retryFlag += 1
+                  }) {
+                    Text(text = "Retry")
+                  }
+                }
               }
             }
           }

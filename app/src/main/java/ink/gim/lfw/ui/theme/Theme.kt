@@ -9,7 +9,8 @@ private val DarkColorScheme = darkColorScheme(
   primary = Color(0xFF1333CB),
   secondary = Color(0xFF3B52C2),
   tertiary = Color(0xFF2344E1),
-  background = Color(0xFF000000)
+  background = Color(0xFF000000),
+  onPrimary = Color(0xFFFFFFFF)
 )
 
 @Composable
