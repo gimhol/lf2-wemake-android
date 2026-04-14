@@ -119,11 +119,11 @@ fun ApkSigningConfig.handleKeystoreConfig() {
   storePassword = config.storePassword
   keyAlias = config.keyAlias
   keyPassword = config.keyPassword
-  println("${this.name} keystore properties:")
-  println("   storeFile: $storeFile")
-  println("   storePassword: $storePassword")
-  println("   keyAlias: $keyAlias")
-  println("   keyPassword: $keyPassword")
+//  println("${this.name} keystore properties:")
+//  println("   storeFile: $storeFile")
+//  println("   storePassword: $storePassword")
+//  println("   keyAlias: $keyAlias")
+//  println("   keyPassword: $keyPassword")
 }
 
 android {
