@@ -1,8 +1,10 @@
 package ink.gim.lfw
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Message
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -50,6 +52,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
   private var uploadMessage: ValueCallback<Array<Uri>>? = null
@@ -135,8 +138,33 @@ class MainActivity : ComponentActivity() {
                     intent?.let { filePickerLauncher.launch(it) }
                     return true
                   }
+
+                  override fun onCreateWindow(
+                    view: WebView,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: Message
+                  ): Boolean {
+                    val wv = WebView(view.context)
+                    val transport = resultMsg.obj as WebView.WebViewTransport
+                    transport.webView = wv
+                    wv.webViewClient = object : WebViewClient() {
+                      override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+                        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                        view.context.startActivity(intent)
+                        return true
+                      }
+                    }
+                    resultMsg.sendToTarget()
+                    return true
+                  }
                 }
                 it.webViewClient = object : WebViewClient() {
+                  override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                    view?.loadUrl(url.orEmpty())
+                    return true
+                  }
+
                   override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     if (pageFinished) return
@@ -196,6 +224,8 @@ fun FullScreenWebView(
       settings.allowContentAccess = true
       settings.mediaPlaybackRequiresUserGesture = false
       settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+      settings.javaScriptCanOpenWindowsAutomatically = true
+      settings.setSupportMultipleWindows(true)
       settings.userAgentString = settings.userAgentString + " lfw-mobile-container"
       webViewClient = WebViewClient()
       handleWebView(this)
