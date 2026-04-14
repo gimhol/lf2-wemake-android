@@ -11,21 +11,45 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import ink.gim.lfw.ui.theme.LFWAppTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : ComponentActivity() {
   private var uploadMessage: ValueCallback<Array<Uri>>? = null
@@ -44,7 +68,6 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
-    // 全屏沉浸模式
     window.setFlags(
       WindowManager.LayoutParams.FLAG_FULLSCREEN,
       WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -59,28 +82,91 @@ class MainActivity : ComponentActivity() {
         or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
       )
     setContent {
+      var gameUrl by remember { mutableStateOf<String?>(null) }
+      var text by remember { mutableStateOf<String?>(null) }
+      var pageFinished by remember { mutableStateOf(false) }
+      val alpha = remember { Animatable(0f) }
+      val context = LocalContext.current
+      val coroutineScope = rememberCoroutineScope()
+      LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+          try {
+            val indexUrl = "https://gim.ink/api/lfwm/find?id=1"
+            text = "loading: $indexUrl"
+            val infoPath = HttpReq(indexUrl)
+              .json()
+              .first
+              .getJSONObject("data")
+              .getString("oss_name")
+            val infoUrl = "https://lfwm.gim.ink/$infoPath"
+            text += "\nloading: $infoUrl"
+            gameUrl = HttpReq(infoUrl).json().first.getString("url")
+            text += "\nloading: $gameUrl"
+          } catch (e: Exception) {
+            e.printStackTrace()
+            text += "\n${e.message}\n${e.stackTraceToString()}"
+            withContext(Dispatchers.Main) {
+              Toast.makeText(context, "Failed!", Toast.LENGTH_SHORT).show()
+            }
+          }
+        }
+      }
       LFWAppTheme {
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-          FullScreenWebView(
-            url = "https://lf.gim.ink/0.1.23",
-            modifier = Modifier
-              .padding(innerPadding)
-              .fillMaxSize(),
-            handleWebView = {
-              it.webChromeClient = object : WebChromeClient() {
-                override fun onShowFileChooser(
-                  webView: WebView?,
-                  callback: ValueCallback<Array<Uri>>?,
-                  params: FileChooserParams?
-                ): Boolean {
-                  uploadMessage = callback
-                  val intent = params?.createIntent()
-                  intent?.let { filePickerLauncher.launch(it) }
-                  return true
+        Scaffold(
+          modifier = Modifier
+            .fillMaxSize()
+        ) { innerPadding ->
+          gameUrl?.let { gameUrl ->
+            FullScreenWebView(
+              url = gameUrl,
+              modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .alpha(alpha.value),
+              handleWebView = {
+                it.webChromeClient = object : WebChromeClient() {
+                  override fun onShowFileChooser(
+                    webView: WebView?,
+                    callback: ValueCallback<Array<Uri>>?,
+                    params: FileChooserParams?
+                  ): Boolean {
+                    uploadMessage = callback
+                    val intent = params?.createIntent()
+                    intent?.let { filePickerLauncher.launch(it) }
+                    return true
+                  }
+                }
+                it.webViewClient = object : WebViewClient() {
+                  override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    if (pageFinished) return
+                    text = null
+                    pageFinished = true
+                    coroutineScope.launch {
+                      delay(500)
+                      alpha.animateTo(1.0f, tween(1000))
+                    }
+                    Toast.makeText(context, "Page Loaded!", Toast.LENGTH_SHORT).show()
+                  }
                 }
               }
+            )
+          }
+          text?.let { text ->
+            Box(
+              modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+            ) {
+              SelectionContainer {
+                Text(
+                  text = text,
+                  modifier = Modifier.padding(10.dp)
+                )
+              }
             }
-          )
+          }
         }
       }
     }
@@ -109,7 +195,7 @@ fun FullScreenWebView(
       settings.allowFileAccess = true
       settings.allowContentAccess = true
       settings.mediaPlaybackRequiresUserGesture = false
-      settings.cacheMode = WebSettings.LOAD_DEFAULT
+      settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
       settings.userAgentString = settings.userAgentString + " lfw-mobile-container"
       webViewClient = WebViewClient()
       handleWebView(this)
@@ -134,5 +220,26 @@ fun FullScreenWebView(
   // 返回键网页回退
   BackHandler(enabled = webView.canGoBack()) {
     webView.goBack()
+  }
+}
+
+class HttpReq(val url: String) {
+  fun text(): Pair<String, HttpURLConnection> {
+    val url = URL(this.url)
+    val conn = url.openConnection() as HttpURLConnection
+    conn.requestMethod = "GET"
+    conn.instanceFollowRedirects = true
+    conn.connect()
+    // 读取结果
+    val reader = BufferedReader(InputStreamReader(conn.inputStream))
+    val response = reader.readText()
+    reader.close()
+    conn.disconnect()
+    return response to conn
+  }
+
+  fun json(): Pair<JSONObject, HttpURLConnection> {
+    val (str, conn) = this.text()
+    return JSONObject(str) to conn
   }
 }
