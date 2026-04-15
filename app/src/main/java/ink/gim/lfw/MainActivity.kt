@@ -1,21 +1,17 @@
 package ink.gim.lfw
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Message
 import android.view.View
-import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,8 +30,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,17 +41,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import ink.gim.lfw.ui.theme.LFWAppTheme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
 import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
@@ -130,7 +117,7 @@ class MainActivity : ComponentActivity() {
             .fillMaxSize()
         ) { innerPadding ->
           gameUrl?.let { gameUrl ->
-            FullScreenWebView(
+            WebView(
               url = gameUrl,
               modifier = Modifier
                 .fillMaxSize()
@@ -231,75 +218,3 @@ class MainActivity : ComponentActivity() {
   }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-fun FullScreenWebView(
-  url: String,
-  modifier: Modifier = Modifier,
-  handleWebView: (it: WebView) -> Unit = {},
-) {
-  val context = LocalContext.current
-  val webView = remember {
-    WebView(context).apply {
-      setLayerType(View.LAYER_TYPE_HARDWARE, null)
-      layoutParams = ViewGroup.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT,
-        ViewGroup.LayoutParams.MATCH_PARENT
-      )
-      setBackgroundColor(0)
-      background = null
-      settings.javaScriptEnabled = true
-      settings.domStorageEnabled = true
-      settings.allowFileAccess = true
-      settings.allowContentAccess = true
-      settings.mediaPlaybackRequiresUserGesture = false
-      settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
-      settings.javaScriptCanOpenWindowsAutomatically = true
-      settings.setSupportMultipleWindows(true)
-      settings.userAgentString = settings.userAgentString + " lfw-mobile-container"
-      webViewClient = WebViewClient()
-      handleWebView(this)
-    }
-  }
-  AndroidView(
-    factory = { webView },
-    modifier = modifier
-  ) { view ->
-    if (view.url != url) {
-      view.loadUrl(url)
-    }
-  }
-
-  DisposableEffect(Unit) {
-    onDispose {
-      webView.stopLoading()
-      webView.destroy()
-    }
-  }
-
-  // 返回键网页回退
-  BackHandler(enabled = webView.canGoBack()) {
-    webView.goBack()
-  }
-}
-
-class HttpReq(val url: String) {
-  fun text(): Pair<String, HttpURLConnection> {
-    val url = URL(this.url)
-    val conn = url.openConnection() as HttpURLConnection
-    conn.requestMethod = "GET"
-    conn.instanceFollowRedirects = true
-    conn.connect()
-    // 读取结果
-    val reader = BufferedReader(InputStreamReader(conn.inputStream))
-    val response = reader.readText()
-    reader.close()
-    conn.disconnect()
-    return response to conn
-  }
-
-  fun json(): Pair<JSONObject, HttpURLConnection> {
-    val (str, conn) = this.text()
-    return JSONObject(str) to conn
-  }
-}
