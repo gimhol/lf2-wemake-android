@@ -7,14 +7,13 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.io.FileNotFoundException
 import java.io.InputStream
-import java.util.Locale
 
 /**
- * 本地资源拦截器：拦截 [baseHost] 域下的所有请求，从 assets/[assetRoot] 提供本地文件。
+ * 本地资源拦截器（兜底）：正常情况下由 [LocalAssetServer]（本地 HTTP 服务器）提供资源，
+ * 支持大文件（>16MB）与 Range 请求。
  *
- * WebView 加载 http://localhost:3000/ 后，页面内所有相对路径请求
- * （js/css/图片/fetch/XHR 等）都会被这里拦截并返回本地文件，
- * 因此无需在设备上运行 HTTP 服务器。
+ * 仅当本地服务器尚未就绪时，本拦截器才兜底拦截 [baseHost] 域下的请求，
+ * 从 assets/[assetRoot] 返回本地文件，避免页面首屏在服务器启动前加载失败。
  */
 class LocalWebViewClient(
   private val context: Context,
@@ -30,7 +29,12 @@ class LocalWebViewClient(
     val url = request.url ?: return null
     // 只处理我们自己的本地地址，其余请求（外链等）走默认网络行为
     if (!url.host.equals(baseHost, ignoreCase = true)) return null
-    if (basePort > 0 && url.port in 1..65535 && url.port != basePort) return null
+    // 端口判断：服务器运行时用其实际绑定端口，否则用配置的默认端口
+    val effectivePort = LocalAssetServer.currentPort ?: basePort
+    if (effectivePort > 0 && url.port in 1..65535 && url.port != effectivePort) return null
+    // 本地 HTTP 服务器已就绪：交给真实网络栈处理（支持大文件与 Range），不再拦截
+    if (LocalAssetServer.isAnyRunning) return null
+    // 服务器未就绪：兜底从 assets 提供文件
     return loadFromAssets(url.path ?: "/")
   }
 
@@ -57,47 +61,5 @@ class LocalWebViewClient(
     return null
   }
 
-  private fun guessMimeType(fileName: String): String {
-    val ext = fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)
-    return MIME_TYPES[ext] ?: "application/octet-stream"
-  }
-
-  companion object {
-    private val MIME_TYPES = mapOf(
-      "html" to "text/html",
-      "htm" to "text/html",
-      "js" to "application/javascript",
-      "mjs" to "application/javascript",
-      "css" to "text/css",
-      "json" to "application/json",
-      "map" to "application/json",
-      "png" to "image/png",
-      "jpg" to "image/jpeg",
-      "jpeg" to "image/jpeg",
-      "gif" to "image/gif",
-      "webp" to "image/webp",
-      "svg" to "image/svg+xml",
-      "ico" to "image/x-icon",
-      "bmp" to "image/bmp",
-      "avif" to "image/avif",
-      "wasm" to "application/wasm",
-      "mp3" to "audio/mpeg",
-      "ogg" to "audio/ogg",
-      "oga" to "audio/ogg",
-      "wav" to "audio/wav",
-      "m4a" to "audio/mp4",
-      "flac" to "audio/flac",
-      "mp4" to "video/mp4",
-      "webm" to "video/webm",
-      "woff" to "font/woff",
-      "woff2" to "font/woff2",
-      "ttf" to "font/ttf",
-      "otf" to "font/otf",
-      "txt" to "text/plain",
-      "xml" to "text/xml",
-      "webmanifest" to "application/manifest+json",
-      "pdf" to "application/pdf",
-      "zip" to "application/zip"
-    )
-  }
+  private fun guessMimeType(fileName: String): String = MimeTypes.guess(fileName)
 }

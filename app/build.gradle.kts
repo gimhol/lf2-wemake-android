@@ -176,9 +176,10 @@ android {
   buildFeatures {
     compose = true
   }
-  // assets 中的 Web 资源不压缩，提升 shouldInterceptRequest 读取性能
+  // assets 中的 Web 资源不压缩：本地 HTTP 服务器需 openFd（未压缩存储）以支持大文件与 Range；
+  // zip 本身已压缩，再次压缩无意义且 100MB 级文件每次解压极慢
   androidResources {
-    noCompress += listOf("html", "js", "mjs", "css", "json", "wasm")
+    noCompress += listOf("html", "js", "mjs", "css", "json", "wasm", "zip")
   }
 }
 
