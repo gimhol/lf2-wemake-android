@@ -39,7 +39,8 @@ fun WebView(url: String, modifier: Modifier = Modifier, handleWebView: (it: WebV
       settings.javaScriptCanOpenWindowsAutomatically = true
       settings.setSupportMultipleWindows(true)
       settings.userAgentString = settings.userAgentString + " lfw-mobile-container"
-      webViewClient = WebViewClient()
+      // 拦截 http://localhost:3000/ 请求，从 assets/www 提供本地文件
+      webViewClient = LocalWebViewClient(context)
       handleWebView(this)
     }
   }

@@ -48,6 +48,11 @@ import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
+  // 加载模式开关：
+  // true  = 本地模式：从 assets/www 加载（由 shouldInterceptRequest 拦截 http://localhost:3000/ 提供）
+  // false = 远端模式：从 gim.ink 动态获取游戏地址（原有逻辑）
+  private val useLocalMode = true
+
   private var uploadMessage: ValueCallback<Array<Uri>>? = null
   private val filePickerLauncher = registerForActivityResult(
     ActivityResultContracts.StartActivityForResult()
@@ -89,17 +94,25 @@ class MainActivity : ComponentActivity() {
         withContext(Dispatchers.IO) {
           try {
             pageStatus = "loading"
-            val indexUrl = "https://gim.ink/api/lfwm/find?id=1"
-            text = "loading: $indexUrl"
-            val infoPath = HttpReq(indexUrl)
-              .json()
-              .first
-              .getJSONObject("data")
-              .getString("oss_name")
-            val infoUrl = "https://lfwm.gim.ink/$infoPath"
-            text += "\nloading: $infoUrl"
-            gameUrl = HttpReq(infoUrl).json().first.getString("url")
-            text += "\nloading: $gameUrl"
+            if (useLocalMode) {
+              // 本地模式：从 assets/www 加载，请求由 shouldInterceptRequest 拦截 localhost:3000 提供
+              val indexUrl = "http://localhost:3000/"
+              text = "loading: $indexUrl"
+              gameUrl = indexUrl
+            } else {
+              // 远端模式：从 gim.ink 动态获取游戏地址（原有逻辑）
+              val indexUrl = "https://gim.ink/api/lfwm/find?id=1"
+              text = "loading: $indexUrl"
+              val infoPath = HttpReq(indexUrl)
+                .json()
+                .first
+                .getJSONObject("data")
+                .getString("oss_name")
+              val infoUrl = "https://lfwm.gim.ink/$infoPath"
+              text += "\nloading: $infoUrl"
+              gameUrl = HttpReq(infoUrl).json().first.getString("url")
+              text += "\nloading: $gameUrl"
+            }
           } catch (e: Exception) {
             e.printStackTrace()
             text += "\n${e.message}\n${e.stackTraceToString()}"
@@ -156,7 +169,8 @@ class MainActivity : ComponentActivity() {
                     return true
                   }
                 }
-                it.webViewClient = object : WebViewClient() {
+                // 继承 LocalWebViewClient，保留本地资源拦截能力
+                it.webViewClient = object : LocalWebViewClient(context) {
                   override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                     view?.loadUrl(url.orEmpty())
                     return true

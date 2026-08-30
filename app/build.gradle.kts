@@ -176,6 +176,10 @@ android {
   buildFeatures {
     compose = true
   }
+  // assets 中的 Web 资源不压缩，提升 shouldInterceptRequest 读取性能
+  androidResources {
+    noCompress += listOf("html", "js", "mjs", "css", "json", "wasm")
+  }
 }
 
 dependencies {
